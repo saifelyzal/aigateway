@@ -5046,6 +5046,9 @@ func TestIsAdaptiveThinkingModel(t *testing.T) {
 		{"claude-sonnet-4-6", true},
 		{"claude-sonnet-4-6-20260301", true},
 		{"claude-haiku-4-6", false},
+		{"claude-haiku-5", true},
+		{"claude-haiku-5-5", true},
+		{"claude-haiku-5-5-20261001", true},
 		{"claude-haiku-4-6-20260501", false},
 		{"claude-3-5-sonnet-20241022", false},
 		{"claude-opus-4-5-20251101", false},
@@ -6073,6 +6076,33 @@ func TestConvertToAnthropicRequest_HonoursDefaultMaxTokensEnv(t *testing.T) {
 	}
 	if got.MaxTokens != 32768 {
 		t.Errorf("MaxTokens = %d, want 32768", got.MaxTokens)
+	}
+}
+
+func TestConvertToAnthropicRequest_UsesMaxCompletionTokens(t *testing.T) {
+	req := &core.ChatRequest{
+		Model:    "claude-haiku-5-5",
+		Messages: []core.Message{{Role: "user", Content: "Hello"}},
+		ExtraFields: core.UnknownJSONFieldsFromMap(map[string]json.RawMessage{
+			"max_completion_tokens": json.RawMessage(`32768`),
+		}),
+	}
+	got, err := convertToAnthropicRequest(req)
+	if err != nil {
+		t.Fatalf("convertToAnthropicRequest returned error: %v", err)
+	}
+	if got.MaxTokens != 32768 {
+		t.Errorf("MaxTokens = %d, want 32768", got.MaxTokens)
+	}
+
+	explicit := 1000
+	req.MaxTokens = &explicit
+	got, err = convertToAnthropicRequest(req)
+	if err != nil {
+		t.Fatalf("convertToAnthropicRequest returned error: %v", err)
+	}
+	if got.MaxTokens != 1000 {
+		t.Errorf("max_tokens should win over max_completion_tokens: MaxTokens = %d", got.MaxTokens)
 	}
 }
 
