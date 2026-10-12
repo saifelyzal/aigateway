@@ -413,6 +413,8 @@ func convertToAnthropicRequest(req *core.ChatRequest) (*anthropicRequest, error)
 
 	if req.MaxTokens != nil {
 		anthropicReq.MaxTokens = *req.MaxTokens
+	} else if n, ok := maxCompletionTokensFromExtra(req.ExtraFields); ok {
+		anthropicReq.MaxTokens = n
 	} else {
 		anthropicReq.MaxTokens = resolveDefaultMaxTokens()
 	}
@@ -816,6 +818,21 @@ func resolveAnthropicTopP(req *core.ChatRequest) *float64 {
 // stopSequencesFromExtra maps the OpenAI-compatible stop field (a string or an
 // array of strings, carried in the request's extra fields) to Anthropic's
 // stop_sequences. Empty or malformed values yield no sequences.
+// maxCompletionTokensFromExtra reads OpenAI's max_completion_tokens (the
+// newer name for max_tokens), so clients using it are not silently capped at
+// the default.
+func maxCompletionTokensFromExtra(extraFields core.UnknownJSONFields) (int, bool) {
+	raw := bytes.TrimSpace(extraFields.Lookup("max_completion_tokens"))
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return 0, false
+	}
+	var n int
+	if err := json.Unmarshal(raw, &n); err != nil || n <= 0 {
+		return 0, false
+	}
+	return n, true
+}
+
 func stopSequencesFromExtra(extraFields core.UnknownJSONFields) []string {
 	raw := bytes.TrimSpace(extraFields.Lookup("stop"))
 	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
